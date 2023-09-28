@@ -2,24 +2,61 @@ import pickle
 import streamlit as st
 import pandas as pd
 
-model = pickle.load(open('app/artifactory/wm-model.pkl','rb'))
+def header():
+    st.header("WM Forecasting")
 
-data = pd.read_csv('app/artifactory/Processed_DatasetsAmount-of Waste-Generated-By-State 32121-0003.csv')
+@st.cache_data
+def load_data():
+    df = pd.read_csv('app/artifactory/Processed_DatasetsAmount-of Waste-Generated-By-State 32121-0003.csv')
+    return df
 
-states = data['States'].unique()
+def states():
+    data = load_data()
+    s_df = data['States'].unique()
+    s_df.tolist()
 
-df_input = pd.DataFrame(states,columns=['States'])
+@st.cache_resource
+def load_model():
+    model = pickle.load(open('app/artifactory/wm-model.pkl','rb'))
+    return model
 
-df_input['Year'] = 2022
+def show_search_query():
+    query = st.number_input("Enter Year  ",min_value=2022,max_value=2026,value=2022,step=1)
+    waste = st.selectbox("Select Waste Type",('Residual household and bulky wastes',
+       'Separately collected organic wastes',
+       'Separately collected recyclables'))
 
-df_input['Types of Waste'] = 'Residual household and bulky wastes'
+    if query:
+        df = predict(query,waste)
+        df['Year'] = df['Year'].astype(int)
+        st.write(df)
 
-output = model.predict(df_input)
+def predict(year,waste):
 
-df_predicted = pd.DataFrame(output, columns=['Total Household Waste Generated (Tons)','Household Waste Generated per Inhabitant (kg)'])
+    data = load_data()
+    model = load_model()
+    states = data['States'].unique()
 
-df_final_bulk = pd.concat([df_input,df_predicted],axis=1)
+    df_input = pd.DataFrame(states,columns=['States'])
 
-df_final_bulk.index = df_final_bulk.index+1
+    df_input['Year'] = year
 
-st.write(df_final_bulk)
+    df_input['Types of Waste'] = waste
+
+    output = model.predict(df_input)
+
+    df_predicted = pd.DataFrame(output, columns=['Total Household Waste Generated (Tons)','Household Waste Generated per Inhabitant (kg)'])
+
+    df_final_bulk = pd.concat([df_input,df_predicted],axis=1)
+
+    df_final_bulk.index = df_final_bulk.index+1
+
+    return df_final_bulk
+
+
+def main():
+    header()
+    show_search_query()
+
+
+main()
